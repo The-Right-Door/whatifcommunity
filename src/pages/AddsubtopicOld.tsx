@@ -4,7 +4,6 @@ import { Users, ChevronLeft, Plus, AlertCircle } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { supabase } from '../lib/supabase';
 import { addSubtopic } from '../services/subtopicService';
-import MandatoryAssessmentModal from '../components/MandatoryAssessmentModal';
 
 interface LocationState {
   topicId?: string;
@@ -41,21 +40,18 @@ export default function AddSubtopic() {
     fullExplanation: ''
   });
 
-  const [showMandatoryModal, setShowMandatoryModal] = useState(false);
-  const [savedSubtopicId, setSavedSubtopicId] = useState<number | null>(null);
-
   useEffect(() => {
     const fetchTopicName = async () => {
       if (topicId) {
         try {
-          const { data: topicData, error: topicError } = await supabase
+          const { data, error } = await supabase
             .from('topics')
             .select('topic')
             .eq('topics_id', topicId)
             .single();
 
-          if (topicError) throw topicError;
-          if (topicData) setTopicName(topicData.topic);
+          if (error) throw error;
+          if (data) setTopicName(data.topic);
         } catch (error) {
           console.error('Error fetching topic:', error);
           toast.error('Failed to load topic information');
@@ -88,7 +84,7 @@ export default function AddSubtopic() {
     const today = new Date().toISOString().split('T')[0];
 
     try {
-      const savedSubtopic = await addSubtopic({
+      await addSubtopic({
         topic_id: Number(topicId),
         subtopic_title: formData.title.trim(),
         small_description: formData.description.trim() || null,
@@ -100,13 +96,11 @@ export default function AddSubtopic() {
       });
 
       toast.success('Subtopic saved successfully');
-      
+
       if (andAddAnother) {
         setFormData({ title: '', description: '', fullExplanation: '' });
       } else {
-        // Show the mandatory assessment modal
-        setSavedSubtopicId(savedSubtopic.subtopic_id);
-        setShowMandatoryModal(true);
+        navigate(returnPath || '/subjects');
       }
     } catch (error) {
       console.error('Error saving subtopic:', error);
@@ -144,29 +138,6 @@ export default function AddSubtopic() {
         </div>
       </div>
     ));
-  };
-
-  const handleMandatorySave = async (isMandatory: boolean, assessmentId: string | null) => {
-    if (!savedSubtopicId) return;
-    
-    try {
-      const { error } = await supabase
-        .from('subtopics')
-        .update({
-          must_complete_assessment: isMandatory,
-          required_assessment_id: assessmentId
-        })
-        .eq('subtopic_id', savedSubtopicId);
-        
-      if (error) throw error;
-      
-      toast.success('Mandatory assessment setting saved');
-      navigate(returnPath || '/subjects');
-    } catch (error) {
-      console.error('Error updating mandatory assessment:', error);
-      toast.error('Failed to update mandatory assessment setting');
-      navigate(returnPath || '/subjects');
-    }
   };
 
   return (
@@ -244,19 +215,6 @@ export default function AddSubtopic() {
           </div>
         </div>
       </div>
-
-      {/* Mandatory Assessment Modal */}
-      {showMandatoryModal && savedSubtopicId && (
-        <MandatoryAssessmentModal
-          isOpen={showMandatoryModal}
-          onClose={() => {
-            setShowMandatoryModal(false);
-            navigate(returnPath || '/subjects');
-          }}
-          subtopicId={savedSubtopicId}
-          onSave={handleMandatorySave}
-        />
-      )}
     </div>
   );
 }
